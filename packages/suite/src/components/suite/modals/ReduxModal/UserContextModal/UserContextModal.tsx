@@ -13,6 +13,7 @@ import {
 } from 'src/components/earn';
 import { useDispatch } from 'src/hooks/suite';
 import type { AcquiredDevice } from 'src/types/suite';
+import { PolygonStakeModal } from 'src/views/wallet/polygon-staking/PolygonStakeModal';
 
 import { ConfirmAddressModal } from '../ConfirmAddressModal';
 import { ConfirmXpubModal } from '../ConfirmXpubModal';
@@ -159,6 +160,8 @@ export const UserContextModal = ({ payload }: ReduxModalProps<typeof MODAL_CONTE
             return <EarnClaimModal onCancel={onCancel} account={payload.account} />;
         case 'change-delegate':
             return <StakeChangeDelegateModal onCancel={onCancel} />;
+        case 'polygon-stake':
+            return <PolygonStakeModal account={payload.account} onCancel={onCancel} />;
         case 'copy-address':
             return (
                 <CopyAddressModal

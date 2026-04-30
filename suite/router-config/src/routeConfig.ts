@@ -200,6 +200,12 @@ export const routes = [
         params: walletParams,
     },
     {
+        name: 'wallet-polygon-staking',
+        pattern: '/accounts/polygon-staking',
+        app: 'wallet',
+        params: walletParams,
+    },
+    {
         name: 'wallet-receive',
         pattern: '/accounts/receive',
         app: 'wallet',

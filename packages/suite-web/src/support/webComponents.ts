@@ -65,6 +65,11 @@ export const webComponents: Record<PageName, LazyExoticComponent<ComponentType>>
             ({ WalletStaking }) => ({ default: WalletStaking }),
         ),
     ),
+    'wallet-polygon-staking': lazy(() =>
+        import(
+            /* webpackChunkName: "wallet" */ 'src/views/wallet/polygon-staking/WalletPolygonStaking'
+        ).then(({ WalletPolygonStaking }) => ({ default: WalletPolygonStaking })),
+    ),
     'wallet-sign-verify': lazy(
         () => import(/* webpackChunkName: "wallet" */ 'src/views/wallet/sign-verify'),
     ),

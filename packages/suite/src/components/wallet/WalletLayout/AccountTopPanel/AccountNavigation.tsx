@@ -74,6 +74,18 @@ export const AccountNavigation = () => {
             'data-testid': '@wallet/menu/staking',
         },
         {
+            id: 'wallet-polygon-staking',
+            callback: () => {
+                goToWithAnalytics({
+                    routeName: 'wallet-polygon-staking',
+                    preserveParams: true,
+                });
+            },
+            title: <Translation id="TR_NAV_STAKING" />,
+            isHidden: account?.symbol !== 'pol',
+            'data-testid': '@wallet/menu/polygon-staking',
+        },
+        {
             id: 'wallet-details',
             callback: () => {
                 goToWithAnalytics({ routeName: 'wallet-details', preserveParams: true });

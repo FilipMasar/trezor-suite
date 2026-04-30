@@ -184,6 +184,10 @@ export type UserContextPayload =
           type: 'change-delegate';
       }
     | {
+          type: 'polygon-stake';
+          account: Account;
+      }
+    | {
           type: 'copy-address';
           addressType: AddressType;
           address: string;
