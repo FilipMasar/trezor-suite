@@ -140,6 +140,29 @@
         },
         {
             "blockchain_link": {
+                "type": "evm-rpc",
+                "url": ["https://polygon-rpc.com"]
+            },
+            "chain": "pol",
+            "chain_id": 137,
+            "blocktime_seconds": 2,
+            "coingecko_id": "polygon-pos",
+            "is_testnet": false,
+            "label": "POL",
+            "name": "Polygon",
+            "shortcut": "POL",
+            "slip44": 966,
+            "support": {
+                "T1B1": "1.9.4",
+                "T2B1": "2.6.1",
+                "T2T1": "2.3.5",
+                "T3B1": "2.8.1",
+                "T3T1": "2.6.1",
+                "T3W1": "2.6.1"
+            }
+        },
+        {
+            "blockchain_link": {
                 "type": "blockbook",
                 "url": ["https://base.trezor.io"]
             },
