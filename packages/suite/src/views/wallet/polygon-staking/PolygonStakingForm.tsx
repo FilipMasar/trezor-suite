@@ -4,7 +4,6 @@ import { useDevice } from '@suite/device';
 import { useTranslation } from '@suite/intl';
 import { type Account } from '@suite-common/wallet-types';
 import { Button, Column, Input, Paragraph, Tooltip } from '@trezor/components';
-import { spacings } from '@trezor/theme';
 import { BigNumber } from '@trezor/utils';
 
 import { setConnectionModal } from 'src/actions/device/deviceSlice';
@@ -82,7 +81,7 @@ export const PolygonStakingForm = ({ account }: Props) => {
 
     return (
         <form onSubmit={submit}>
-            <Column gap={spacings.sm} alignItems="flex-start">
+            <Column gap={12} alignItems="flex-start">
                 <Paragraph intent="neutral" priority="secondary">
                     Available balance: {account.formattedBalance} POL
                 </Paragraph>

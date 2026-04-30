@@ -1,5 +1,4 @@
 import { Column, H2, Paragraph } from '@trezor/components';
-import { spacings } from '@trezor/theme';
 
 import { WalletLayout } from 'src/components/wallet';
 import { useSelector } from 'src/hooks/suite';
@@ -13,8 +12,8 @@ export const WalletPolygonStaking = () => {
 
     return (
         <WalletLayout title="TR_NAV_STAKING" account={selectedAccount}>
-            <Column gap={spacings.lg} alignItems="flex-start">
-                <Column gap={spacings.sm} alignItems="flex-start">
+            <Column gap={20} alignItems="flex-start">
+                <Column gap={12} alignItems="flex-start">
                     <H2>Polygon Liquid Staking</H2>
                     <Paragraph intent="neutral" priority="secondary">
                         Stake POL and receive a liquid staking token in return — keep your stake
