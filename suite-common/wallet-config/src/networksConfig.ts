@@ -104,6 +104,7 @@ export const networks = {
             'nft-definitions',
             'eip1559',
             'graph',
+            'staking',
         ],
         backendTypes: ['blockbook', 'evm-rpc'],
         accountTypes: {
