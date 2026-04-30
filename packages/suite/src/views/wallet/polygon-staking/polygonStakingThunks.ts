@@ -1,0 +1,137 @@
+import { fromWei } from 'web3-utils';
+
+import { createEvmEncoder } from '@suite-common/calldata/src/encoder/evm';
+import { selectSelectedDevice } from '@suite-common/device';
+import { createThunk } from '@suite-common/redux-utils';
+import { notificationsActions } from '@suite-common/toast-notifications';
+import { selectAccountByKey } from '@suite-common/wallet-core';
+import { ethereumGetCurrentNonceThunk } from '@suite-common/wallet-core/src/send/sendFormEthereumThunks';
+import { type Account, type AccountKey } from '@suite-common/wallet-types';
+import {
+    convertAmountUnitsToSubunits,
+    getAccountIdentity,
+    getEthereumEstimateFeeParams,
+    prepareEthereumTransaction,
+} from '@suite-common/wallet-utils';
+import TrezorConnect from '@trezor/connect';
+
+const SPOL_CHILD_CONTRACT_ADDRESS = '0xd1CD49A08AeF3Af93457aEc17C786C2b7F48eCd7';
+const POLYGON_CHAIN_ID = 137;
+const POL_DECIMALS = 18;
+
+const buySPOLAbi = [
+    {
+        type: 'function',
+        name: 'buySPOL',
+        inputs: [{ name: '_polAmount', type: 'uint256' }],
+        outputs: [],
+        stateMutability: 'payable',
+    },
+] as const;
+
+const encodeBuySPOL = createEvmEncoder(buySPOLAbi);
+
+const fail = (dispatch: any, error: string) => {
+    dispatch(notificationsActions.addToast({ type: 'sign-tx-error', error }));
+
+    return error;
+};
+
+export const buySPOLThunk = createThunk<
+    { txid: string },
+    { accountKey: AccountKey; amountInPol: string },
+    { rejectValue: string }
+>(
+    'polygon-staking/buySPOL',
+    async ({ accountKey, amountInPol }, { dispatch, getState, rejectWithValue }) => {
+        const account = selectAccountByKey(getState(), accountKey);
+        const device = selectSelectedDevice(getState());
+
+        if (!account || account.networkType !== 'ethereum' || account.symbol !== 'pol') {
+            return rejectWithValue(fail(dispatch, 'Polygon account required.'));
+        }
+        if (!device) {
+            return rejectWithValue(fail(dispatch, 'No device connected.'));
+        }
+
+        const amountWei = convertAmountUnitsToSubunits(amountInPol, POL_DECIMALS);
+
+        const data = encodeBuySPOL({ _polAmount: BigInt(amountWei) });
+
+        const estimateParams = getEthereumEstimateFeeParams(
+            SPOL_CHILD_CONTRACT_ADDRESS,
+            amountInPol,
+            undefined,
+            data,
+        );
+        const fee = await TrezorConnect.blockchainEstimateFee({
+            coin: account.symbol,
+            identity: getAccountIdentity(account),
+            request: {
+                blocks: [2],
+                specific: { from: account.descriptor, ...estimateParams },
+            },
+        });
+        if (!fee.success) {
+            return rejectWithValue(fail(dispatch, `Fee estimate failed: ${fee.error.message}`));
+        }
+        const level = fee.payload.levels[0];
+        const eip1559 = level.eip1559?.medium;
+        if (!level.feeLimit || !eip1559?.maxFeePerGas || !eip1559?.maxPriorityFeePerGas) {
+            return rejectWithValue(fail(dispatch, 'Fee estimate missing EIP-1559 fields.'));
+        }
+
+        const { nonce } = await dispatch(
+            ethereumGetCurrentNonceThunk({
+                selectedAccount: account as Account & { networkType: 'ethereum' },
+            }),
+        ).unwrap();
+
+        const transaction = prepareEthereumTransaction({
+            chainId: POLYGON_CHAIN_ID,
+            to: SPOL_CHILD_CONTRACT_ADDRESS,
+            amount: amountInPol,
+            data,
+            gasLimit: level.feeLimit,
+            maxFeePerGas: fromWei(eip1559.maxFeePerGas, 'gwei'),
+            maxPriorityFeePerGas: fromWei(eip1559.maxPriorityFeePerGas, 'gwei'),
+            nonce,
+        });
+
+        const signed = await TrezorConnect.ethereumSignTransaction({
+            device: {
+                path: device.path,
+                instance: device.instance,
+                state: device.state,
+                useEmptyPassphrase: device.useEmptyPassphrase,
+            },
+            path: account.path,
+            transaction,
+        });
+        if (!signed.success) {
+            return rejectWithValue(fail(dispatch, signed.error.message));
+        }
+
+        const push = await TrezorConnect.pushTransaction({
+            tx: signed.payload.serializedTx,
+            coin: account.symbol,
+            identity: getAccountIdentity(account),
+        });
+        if (!push.success) {
+            return rejectWithValue(fail(dispatch, push.error.message));
+        }
+
+        const { txid } = push.payload;
+        dispatch(
+            notificationsActions.addToast({
+                type: 'tx-staked',
+                formattedAmount: `${amountInPol} POL`,
+                descriptor: account.descriptor,
+                symbol: account.symbol,
+                txid,
+            }),
+        );
+
+        return { txid };
+    },
+);
