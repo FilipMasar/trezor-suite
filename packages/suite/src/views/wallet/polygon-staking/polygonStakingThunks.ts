@@ -20,9 +20,7 @@ import {
 import TrezorConnect, { type StaticSessionId } from '@trezor/connect';
 import { BigNumber } from '@trezor/utils';
 
-const SPOL_CHILD_CONTRACT_ADDRESS = '0xd1CD49A08AeF3Af93457aEc17C786C2b7F48eCd7';
-const POLYGON_CHAIN_ID = 137;
-const POL_DECIMALS = 18;
+import { POLYGON_CHAIN_ID, POL_DECIMALS, SPOL_CONTRACT_ADDRESS } from './polygonStakingConstants';
 
 // official ABI from https://github.com/0xPolygon/sPOL-contracts
 const buySPOLAbi = [
@@ -64,7 +62,7 @@ export const convertPOLToSPOL = async (account: Account, amountInPol: string): P
         coin: account.symbol,
         identity: getAccountIdentity(account),
         from: account.descriptor,
-        to: SPOL_CHILD_CONTRACT_ADDRESS,
+        to: SPOL_CONTRACT_ADDRESS,
         data,
     });
 
@@ -121,7 +119,7 @@ export const buySPOLThunk = createThunk<
         const data = encodeBuySPOL({ _polAmount: BigInt(amountWei.toString(10)) });
 
         const estimateParams = getEthereumEstimateFeeParams(
-            SPOL_CHILD_CONTRACT_ADDRESS,
+            SPOL_CONTRACT_ADDRESS,
             amountInPol,
             undefined,
             data,
@@ -151,7 +149,7 @@ export const buySPOLThunk = createThunk<
 
         const transaction = prepareEthereumTransaction({
             chainId: POLYGON_CHAIN_ID,
-            to: SPOL_CHILD_CONTRACT_ADDRESS,
+            to: SPOL_CONTRACT_ADDRESS,
             amount: amountInPol,
             data,
             gasLimit: level.feeLimit,

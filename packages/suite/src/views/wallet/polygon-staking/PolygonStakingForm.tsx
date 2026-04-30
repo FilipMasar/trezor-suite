@@ -15,9 +15,8 @@ import { FormattedCryptoAmount } from 'src/components/suite/FormattedCryptoAmoun
 import { useDispatch } from 'src/hooks/suite';
 import { validateDecimals, validateMin } from 'src/utils/suite/validation';
 
+import { POL_DECIMALS } from './polygonStakingConstants';
 import { buySPOLThunk, convertPOLToSPOL } from './polygonStakingThunks';
-
-const POL_DECIMALS = 18;
 
 type Props = {
     account: Account;
