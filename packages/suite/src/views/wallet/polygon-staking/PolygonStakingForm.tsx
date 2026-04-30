@@ -1,12 +1,14 @@
 import { useForm } from 'react-hook-form';
 
 import { useDevice } from '@suite/device';
-import { useTranslation } from '@suite/intl';
+import { Translation, useTranslation } from '@suite/intl';
 import { type Account } from '@suite-common/wallet-types';
-import { Button, Column, Input, Paragraph, Tooltip } from '@trezor/components';
+import { Button, Column, FractionButton, InfoItem, Input, Row, Tooltip } from '@trezor/components';
+import { spacings } from '@trezor/theme';
 import { BigNumber } from '@trezor/utils';
 
 import { setConnectionModal } from 'src/actions/device/deviceSlice';
+import { FormattedCryptoAmount } from 'src/components/suite/FormattedCryptoAmount';
 import { useDispatch } from 'src/hooks/suite';
 import { validateDecimals, validateMin } from 'src/utils/suite/validation';
 
@@ -16,13 +18,14 @@ const POL_DECIMALS = 18;
 
 type Props = {
     account: Account;
+    onSuccess?: () => void;
 };
 
 type FormValues = {
     amount: string;
 };
 
-export const PolygonStakingForm = ({ account }: Props) => {
+export const PolygonStakingForm = ({ account, onSuccess }: Props) => {
     const dispatch = useDispatch();
     const { device, isLocked } = useDevice();
     const { translationString } = useTranslation();
@@ -31,11 +34,27 @@ export const PolygonStakingForm = ({ account }: Props) => {
         register,
         handleSubmit,
         reset,
+        setValue,
         formState: { errors, isSubmitting, isValid },
     } = useForm<FormValues>({ mode: 'onChange' });
 
     const isDeviceConnected = !!device?.connected && !!device?.available;
     const isDeviceLocked = isDeviceConnected && isLocked();
+
+    const balance = new BigNumber(account.formattedBalance);
+    const hasBalance = balance.gt(0);
+
+    const setRatio = (divisor: number) => {
+        const amount = balance
+            .dividedBy(divisor)
+            .decimalPlaces(POL_DECIMALS, BigNumber.ROUND_DOWN)
+            .toString();
+        setValue('amount', amount, { shouldDirty: true, shouldValidate: true });
+    };
+
+    const setMax = () => {
+        setValue('amount', account.formattedBalance, { shouldDirty: true, shouldValidate: true });
+    };
 
     const submit = handleSubmit(async ({ amount }) => {
         try {
@@ -48,6 +67,7 @@ export const PolygonStakingForm = ({ account }: Props) => {
                 }),
             ).unwrap();
             reset();
+            onSuccess?.();
         } catch {
             // Error toast already surfaced by the thunk; keep the form usable.
         }
@@ -81,10 +101,15 @@ export const PolygonStakingForm = ({ account }: Props) => {
 
     return (
         <form onSubmit={submit}>
-            <Column gap={12} alignItems="flex-start">
-                <Paragraph intent="neutral" priority="secondary">
-                    Available balance: {account.formattedBalance} POL
-                </Paragraph>
+            <Column gap={spacings.md} alignItems="stretch">
+                <InfoItem label={<Translation id="TR_STAKE_AVAILABLE" />}>
+                    <FormattedCryptoAmount
+                        value={account.formattedBalance}
+                        symbol={account.symbol}
+                        isBalance
+                        data-testid="@wallet/polygon-staking/available-balance"
+                    />
+                </InfoItem>
                 <Input
                     label="Amount (POL)"
                     inputMode="decimal"
@@ -95,6 +120,36 @@ export const PolygonStakingForm = ({ account }: Props) => {
                     data-testid="@wallet/polygon-staking/amount"
                     {...amountField}
                 />
+                <Row gap={spacings.xs}>
+                    <FractionButton
+                        id="polygon-stake-10"
+                        isDisabled={!hasBalance}
+                        onClick={() => setRatio(10)}
+                    >
+                        <Translation id="TR_FRACTION_BUTTONS_10_PERCENT" />
+                    </FractionButton>
+                    <FractionButton
+                        id="polygon-stake-25"
+                        isDisabled={!hasBalance}
+                        onClick={() => setRatio(4)}
+                    >
+                        <Translation id="TR_FRACTION_BUTTONS_25_PERCENT" />
+                    </FractionButton>
+                    <FractionButton
+                        id="polygon-stake-50"
+                        isDisabled={!hasBalance}
+                        onClick={() => setRatio(2)}
+                    >
+                        <Translation id="TR_FRACTION_BUTTONS_50_PERCENT" />
+                    </FractionButton>
+                    <FractionButton
+                        id="polygon-stake-max"
+                        isDisabled={!hasBalance}
+                        onClick={setMax}
+                    >
+                        <Translation id="TR_FRACTION_BUTTONS_MAX" />
+                    </FractionButton>
+                </Row>
                 <Tooltip content={getTooltipContent()}>
                     <Button
                         type="button"
