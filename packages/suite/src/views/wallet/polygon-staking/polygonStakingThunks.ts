@@ -4,21 +4,25 @@ import { createEvmEncoder } from '@suite-common/calldata/src/encoder/evm';
 import { selectSelectedDevice } from '@suite-common/device';
 import { createThunk } from '@suite-common/redux-utils';
 import { notificationsActions } from '@suite-common/toast-notifications';
-import { selectAccountByKey } from '@suite-common/wallet-core';
+import { type NetworkSymbol } from '@suite-common/wallet-config';
+import { selectAccounts } from '@suite-common/wallet-core';
 import { ethereumGetCurrentNonceThunk } from '@suite-common/wallet-core/src/send/sendFormEthereumThunks';
-import { type Account, type AccountKey } from '@suite-common/wallet-types';
+import { type Account, type AccountDescriptor } from '@suite-common/wallet-types';
 import {
-    convertAmountUnitsToSubunits,
+    asAmountUnit,
     getAccountIdentity,
     getEthereumEstimateFeeParams,
     prepareEthereumTransaction,
+    unitsToSubunits,
 } from '@suite-common/wallet-utils';
-import TrezorConnect from '@trezor/connect';
+import TrezorConnect, { type StaticSessionId } from '@trezor/connect';
+import { BigNumber } from '@trezor/utils';
 
 const SPOL_CHILD_CONTRACT_ADDRESS = '0xd1CD49A08AeF3Af93457aEc17C786C2b7F48eCd7';
 const POLYGON_CHAIN_ID = 137;
 const POL_DECIMALS = 18;
 
+// official ABI from https://github.com/0xPolygon/sPOL-contracts
 const buySPOLAbi = [
     {
         type: 'function',
@@ -39,12 +43,25 @@ const fail = (dispatch: any, error: string) => {
 
 export const buySPOLThunk = createThunk<
     { txid: string },
-    { accountKey: AccountKey; amountInPol: string },
+    {
+        accountDescriptor: AccountDescriptor;
+        networkSymbol: NetworkSymbol;
+        deviceStaticSessionId: StaticSessionId;
+        amountInPol: string;
+    },
     { rejectValue: string }
 >(
     'polygon-staking/buySPOL',
-    async ({ accountKey, amountInPol }, { dispatch, getState, rejectWithValue }) => {
-        const account = selectAccountByKey(getState(), accountKey);
+    async (
+        { accountDescriptor, networkSymbol, deviceStaticSessionId, amountInPol },
+        { dispatch, getState, rejectWithValue },
+    ) => {
+        const account = selectAccounts(getState()).find(
+            a =>
+                a.descriptor === accountDescriptor &&
+                a.symbol === networkSymbol &&
+                a.deviceState === deviceStaticSessionId,
+        );
         const device = selectSelectedDevice(getState());
 
         if (!account || account.networkType !== 'ethereum' || account.symbol !== 'pol') {
@@ -54,9 +71,12 @@ export const buySPOLThunk = createThunk<
             return rejectWithValue(fail(dispatch, 'No device connected.'));
         }
 
-        const amountWei = convertAmountUnitsToSubunits(amountInPol, POL_DECIMALS);
+        const amountWei = unitsToSubunits({
+            value: asAmountUnit(new BigNumber(amountInPol)),
+            decimals: POL_DECIMALS,
+        });
 
-        const data = encodeBuySPOL({ _polAmount: BigInt(amountWei) });
+        const data = encodeBuySPOL({ _polAmount: BigInt(amountWei.toString(10)) });
 
         const estimateParams = getEthereumEstimateFeeParams(
             SPOL_CHILD_CONTRACT_ADDRESS,

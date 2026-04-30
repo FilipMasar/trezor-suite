@@ -1,13 +1,14 @@
 import { useForm } from 'react-hook-form';
 
+import { useDevice } from '@suite/device';
 import { useTranslation } from '@suite/intl';
-import { selectSelectedDevice } from '@suite-common/device';
 import { type Account } from '@suite-common/wallet-types';
-import { Button, Column, Input, Paragraph } from '@trezor/components';
+import { Button, Column, Input, Paragraph, Tooltip } from '@trezor/components';
 import { spacings } from '@trezor/theme';
 import { BigNumber } from '@trezor/utils';
 
-import { useDispatch, useSelector } from 'src/hooks/suite';
+import { setConnectionModal } from 'src/actions/device/deviceSlice';
+import { useDispatch } from 'src/hooks/suite';
 import { validateDecimals, validateMin } from 'src/utils/suite/validation';
 
 import { buySPOLThunk } from './polygonStakingThunks';
@@ -24,7 +25,7 @@ type FormValues = {
 
 export const PolygonStakingForm = ({ account }: Props) => {
     const dispatch = useDispatch();
-    const device = useSelector(selectSelectedDevice);
+    const { device, isLocked } = useDevice();
     const { translationString } = useTranslation();
 
     const {
@@ -34,14 +35,33 @@ export const PolygonStakingForm = ({ account }: Props) => {
         formState: { errors, isSubmitting, isValid },
     } = useForm<FormValues>({ mode: 'onChange' });
 
-    const onSubmit = handleSubmit(async ({ amount }) => {
+    const isDeviceConnected = !!device?.connected && !!device?.available;
+    const isDeviceLocked = isDeviceConnected && isLocked();
+
+    const submit = handleSubmit(async ({ amount }) => {
         try {
-            await dispatch(buySPOLThunk({ accountKey: account.key, amountInPol: amount })).unwrap();
+            await dispatch(
+                buySPOLThunk({
+                    accountDescriptor: account.descriptor,
+                    networkSymbol: account.symbol,
+                    deviceStaticSessionId: account.deviceState,
+                    amountInPol: amount,
+                }),
+            ).unwrap();
             reset();
         } catch {
             // Error toast already surfaced by the thunk; keep the form usable.
         }
     });
+
+    const onClick = () => {
+        if (!isDeviceConnected) {
+            dispatch(setConnectionModal(true));
+
+            return;
+        }
+        submit();
+    };
 
     const { ref: amountRef, ...amountField } = register('amount', {
         required: 'Amount is required.',
@@ -53,8 +73,15 @@ export const PolygonStakingForm = ({ account }: Props) => {
         },
     });
 
+    const getTooltipContent = () => {
+        if (!isDeviceConnected) return 'Connect your Trezor to stake.';
+        if (isDeviceLocked) return 'Unlock your Trezor to stake.';
+
+        return undefined;
+    };
+
     return (
-        <form onSubmit={onSubmit}>
+        <form onSubmit={submit}>
             <Column gap={spacings.sm} alignItems="flex-start">
                 <Paragraph intent="neutral" priority="secondary">
                     Available balance: {account.formattedBalance} POL
@@ -69,14 +96,17 @@ export const PolygonStakingForm = ({ account }: Props) => {
                     data-testid="@wallet/polygon-staking/amount"
                     {...amountField}
                 />
-                <Button
-                    type="submit"
-                    isDisabled={!device || !isValid || isSubmitting}
-                    isLoading={isSubmitting}
-                    data-testid="@wallet/polygon-staking/stake-button"
-                >
-                    Stake POL
-                </Button>
+                <Tooltip content={getTooltipContent()}>
+                    <Button
+                        type="button"
+                        onClick={onClick}
+                        isDisabled={!isValid || isSubmitting || isDeviceLocked}
+                        isLoading={isSubmitting}
+                        data-testid="@wallet/polygon-staking/stake-button"
+                    >
+                        Stake POL
+                    </Button>
+                </Tooltip>
             </Column>
         </form>
     );
