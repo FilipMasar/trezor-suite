@@ -18,6 +18,7 @@ import Notification from 'src/views/suite/notifications';
 import WalletAnonymize from 'src/views/wallet/anonymize';
 import WalletDetails from 'src/views/wallet/details';
 import { Nfts } from 'src/views/wallet/nfts';
+import { WalletPolygonStaking } from 'src/views/wallet/polygon-staking/WalletPolygonStaking';
 import { Receive } from 'src/views/wallet/receive/Receive';
 import WalletSend from 'src/views/wallet/send';
 import WalletSignVerify from 'src/views/wallet/sign-verify';
@@ -54,6 +55,7 @@ export const desktopComponents: Record<PageName, ComponentType> = {
     'wallet-details': WalletDetails,
     'wallet-send': WalletSend,
     'wallet-staking': WalletStaking,
+    'wallet-polygon-staking': WalletPolygonStaking,
     'wallet-sign-verify': WalletSignVerify,
     'wallet-anonymize': WalletAnonymize,
     'wallet-tokens': Tokens,
