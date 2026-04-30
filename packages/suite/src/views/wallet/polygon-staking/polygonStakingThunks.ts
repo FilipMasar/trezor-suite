@@ -9,10 +9,12 @@ import { selectAccounts } from '@suite-common/wallet-core';
 import { ethereumGetCurrentNonceThunk } from '@suite-common/wallet-core/src/send/sendFormEthereumThunks';
 import { type Account, type AccountDescriptor } from '@suite-common/wallet-types';
 import {
+    asAmountSubunit,
     asAmountUnit,
     getAccountIdentity,
     getEthereumEstimateFeeParams,
     prepareEthereumTransaction,
+    subunitsToUnits,
     unitsToSubunits,
 } from '@suite-common/wallet-utils';
 import TrezorConnect, { type StaticSessionId } from '@trezor/connect';
@@ -33,7 +35,47 @@ const buySPOLAbi = [
     },
 ] as const;
 
+const convertPOLToSPOLAbi = [
+    {
+        type: 'function',
+        name: 'convertPOLToSPOL',
+        inputs: [{ name: '_polAmount', type: 'uint256' }],
+        outputs: [{ name: '', type: 'uint256' }],
+        stateMutability: 'view',
+    },
+] as const;
+
 const encodeBuySPOL = createEvmEncoder(buySPOLAbi);
+const encodeConvertPOLToSPOL = createEvmEncoder(convertPOLToSPOLAbi);
+
+export const convertPOLToSPOL = async (account: Account, amountInPol: string): Promise<string> => {
+    if (account.networkType !== 'ethereum' || account.symbol !== 'pol') {
+        throw new Error('Polygon account required.');
+    }
+
+    const amountWei = unitsToSubunits({
+        value: asAmountUnit(new BigNumber(amountInPol)),
+        decimals: POL_DECIMALS,
+    });
+
+    const data = encodeConvertPOLToSPOL({ _polAmount: BigInt(amountWei.toString(10)) });
+
+    const result = await TrezorConnect.blockchainEvmRpcCall({
+        coin: account.symbol,
+        identity: getAccountIdentity(account),
+        from: account.descriptor,
+        to: SPOL_CHILD_CONTRACT_ADDRESS,
+        data,
+    });
+
+    if (!result.success) {
+        throw new Error(result.error.message);
+    }
+
+    const sPolWei = asAmountSubunit(new BigNumber(BigInt(result.payload.data).toString(10)));
+
+    return subunitsToUnits({ value: sPolWei, decimals: POL_DECIMALS }).toString();
+};
 
 const fail = (dispatch: any, error: string) => {
     dispatch(notificationsActions.addToast({ type: 'sign-tx-error', error }));

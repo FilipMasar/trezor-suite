@@ -1,4 +1,7 @@
+import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
+
+import useDebounce from 'react-use/lib/useDebounce';
 
 import { useDevice } from '@suite/device';
 import { Translation, useTranslation } from '@suite/intl';
@@ -12,7 +15,7 @@ import { FormattedCryptoAmount } from 'src/components/suite/FormattedCryptoAmoun
 import { useDispatch } from 'src/hooks/suite';
 import { validateDecimals, validateMin } from 'src/utils/suite/validation';
 
-import { buySPOLThunk } from './polygonStakingThunks';
+import { buySPOLThunk, convertPOLToSPOL } from './polygonStakingThunks';
 
 const POL_DECIMALS = 18;
 
@@ -35,8 +38,47 @@ export const PolygonStakingForm = ({ account, onSuccess }: Props) => {
         handleSubmit,
         reset,
         setValue,
+        watch,
         formState: { errors, isSubmitting, isValid },
     } = useForm<FormValues>({ mode: 'onChange' });
+
+    const amount = watch('amount');
+    const [previewSPOL, setPreviewSPOL] = useState<string | null>(null);
+    const [previewError, setPreviewError] = useState<string | null>(null);
+    const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+    const latestAmountRef = useRef<string>('');
+
+    useDebounce(
+        () => {
+            if (!amount || !isValid) {
+                setPreviewSPOL(null);
+                setPreviewError(null);
+                setIsPreviewLoading(false);
+
+                return;
+            }
+            latestAmountRef.current = amount;
+            setIsPreviewLoading(true);
+            convertPOLToSPOL(account, amount)
+                .then(result => {
+                    if (latestAmountRef.current === amount) {
+                        setPreviewSPOL(result);
+                        setPreviewError(null);
+                        setIsPreviewLoading(false);
+                    }
+                })
+                .catch(error => {
+                    console.error('convertPOLToSPOL failed', error);
+                    if (latestAmountRef.current === amount) {
+                        setPreviewSPOL(null);
+                        setPreviewError(error?.message ?? 'unknown error');
+                        setIsPreviewLoading(false);
+                    }
+                });
+        },
+        300,
+        [amount, isValid],
+    );
 
     const isDeviceConnected = !!device?.connected && !!device?.available;
     const isDeviceLocked = isDeviceConnected && isLocked();
@@ -99,6 +141,14 @@ export const PolygonStakingForm = ({ account, onSuccess }: Props) => {
         return undefined;
     };
 
+    const getPreviewContent = () => {
+        if (isPreviewLoading) return 'Calculating…';
+        if (previewSPOL) return `${previewSPOL} sPOL`;
+        if (previewError) return `Error: ${previewError}`;
+
+        return '—';
+    };
+
     return (
         <form onSubmit={submit}>
             <Column gap={spacings.md} alignItems="stretch">
@@ -120,6 +170,11 @@ export const PolygonStakingForm = ({ account, onSuccess }: Props) => {
                     data-testid="@wallet/polygon-staking/amount"
                     {...amountField}
                 />
+                <InfoItem label="You will receive">
+                    <span data-testid="@wallet/polygon-staking/preview-spol">
+                        {getPreviewContent()}
+                    </span>
+                </InfoItem>
                 <Row gap={spacings.xs}>
                     <FractionButton
                         id="polygon-stake-10"
